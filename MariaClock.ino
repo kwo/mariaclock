@@ -13,7 +13,7 @@
 const char ssid[] = "*****";  // your network SSID (name)
 const char pass[] = "*****";  // your network password
 
-static const char ntpServerName[] = "de.pool.ntp.org";
+static const char ntpServerName[] = "raspberrypi";
 
 // Central European Time (Berlin, Madrid, Paris, Rome, Warsaw)
 TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120};  // Central European Summer Time
@@ -55,7 +55,7 @@ void setup() {
   Serial.println("waiting for sync");
 
   setSyncProvider(getNtpTime);
-  setSyncInterval(600);
+  setSyncInterval(300);
 
   matrix.begin(0x70);
 
