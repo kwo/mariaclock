@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "2.1.6"
+#define FW_VERSION "2.1.7"
 #include <Homie.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
@@ -170,13 +170,12 @@ void ntpInit() {
   time_t t = 0;
   while (t == 0) {
     t = ntpCheckPacket();
-    if (t != 0) {
-      setTime(t);
-      ntpLastReceived = now();
-      Homie.setNodeProperty(nTime, "value", String(t), true);
-    }
   }
   
+  setTime(t);
+  ntpLastReceived = now();
+  Homie.setNodeProperty(nTime, "value", String(t), true);
+
 }
 
 time_t ntpCheckPacket() {
@@ -199,6 +198,7 @@ time_t ntpCheckPacket() {
 
 // send an NTP request to the time server at the given address
 void ntpSendPacket() {
+
   while (Udp.parsePacket() > 0) ; // discard any previously received packets
 
   // set all bytes in the buffer to 0
@@ -219,5 +219,6 @@ void ntpSendPacket() {
   Udp.beginPacket(ntpServerIP, 123); //NTP requests are to port 123
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
+
 }
 
