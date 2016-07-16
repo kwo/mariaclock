@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "2.1.2"
+#define FW_VERSION "2.1.6"
 #include <Homie.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
@@ -13,10 +13,10 @@ const char *__FLAGGED_FW_VERSION = "\x6a\x3f\x3e\x0e\xe1" FW_VERSION "\xb0\x30\x
 /* End of magic sequence for Autodetectable Binary Upload */
 
 const int LUX_PIN = 0;
-const int LUX_POLL_INTERVAL_MS = 100;   // 100 ms
-const int LUX_SEND_INTERVAL_MS = 10000;  // 10 seconds
-unsigned long luxLastPoll = 0;
-unsigned long luxLastSent = 0;
+const int LUX_POLL_INTERVAL_SEC = 1;   // 1 second
+const int LUX_SEND_INTERVAL_SEC = 10;  // 10 seconds
+time_t luxLastPoll = 0;
+time_t luxLastSent = 0;
 int luxLastReading = 0;
 
 // Central European Time (Berlin, Madrid, Paris, Rome, Warsaw)
@@ -24,14 +24,10 @@ TimeChangeRule CEST = {"CEST", Last, Sun, Mar, 2, 120};  // Central European Sum
 TimeChangeRule CET = {"CET", Last, Sun, Oct, 3, 60};    // Central European Standard Time
 Timezone timezone(CEST, CET);
 
-WiFiUDP Udp;
-unsigned int localPort = 8888;  // local port to listen for UDP packets
-static const char ntpServerName[] = "raspberrypi";
-IPAddress ntpServerIP;
-const int NTP_POLL_INTERVAL_MS = 300000;  // 5 minutes
-const int NTP_PACKET_EXPIRED_MS = 1500;  // 1.5 seconds
-unsigned long ntpLastSent = 0;
-unsigned long ntpLastReceived = 0;
+const int NTP_POLL_INTERVAL_SEC = 300;  // 5 minutes
+const int NTP_PACKET_EXPIRED_SEC = 2;  // 2 seconds
+time_t ntpLastSent = 0;
+time_t ntpLastReceived = 0;
 
 int timeLastMinute = -1; // last recorded minute
 Adafruit_7segment matrix = Adafruit_7segment();
@@ -57,33 +53,21 @@ void loop() {
 }
 
 void hSetup() {
+  ntpInit();
   matrix.begin(0x70);
-  Udp.begin(localPort);
-  WiFi.hostByName(ntpServerName, ntpServerIP);
 }
 
 void hLoop() {
 
-  if (ntpLastSent == 0 && (timeStatus() == timeNotSet || (millis() - ntpLastReceived >= NTP_POLL_INTERVAL_MS))) {
-    ntpSendPacket(ntpServerIP);
-    ntpLastSent = millis();
+  int mm = minute();
+  if (mm != timeLastMinute) { //update the display only if time has changed
+    timeLastMinute = mm;
+    updateDisplay();
   }
 
-  if (ntpLastSent != 0) {
-    time_t t = ntpCheckPacket();
-    if (t != 0) {
-      ntpLastReceived = millis();
-      ntpLastSent = 0;
-      setTime(t);
-      Homie.setNodeProperty(nTime, "value", String(t), true);
-    } else if (millis() - ntpLastSent >= NTP_PACKET_EXPIRED_MS) {
-      ntpLastSent = 0;
-    }
-  }
+  if (now() - luxLastPoll >= LUX_POLL_INTERVAL_SEC) {
 
-  if (millis() - luxLastPoll >= LUX_POLL_INTERVAL_MS) {
-
-    luxLastPoll = millis();
+    luxLastPoll = now();
 
     int luxRaw = analogRead(LUX_PIN);
     // typical readings do not often exceed 512, so limit range to 512 and then map
@@ -91,11 +75,11 @@ void hLoop() {
 
     matrix.setBrightness(luxReading);
 
-    if (millis() - luxLastSent >= LUX_SEND_INTERVAL_MS) {
+    if (now() - luxLastSent >= LUX_SEND_INTERVAL_SEC) {
       if (luxReading != luxLastReading) {
         luxLastReading = luxReading;
         if (Homie.setNodeProperty(nLux, "value", String(luxLastReading), true)) {
-          luxLastSent = millis();
+          luxLastSent = now();
         }
         Homie.setNodeProperty(nLux, "raw", String(luxRaw), true);
       }
@@ -103,11 +87,20 @@ void hLoop() {
 
   }
 
-  if (timeStatus() != timeNotSet) {
-    int mm = minute();
-    if (mm != timeLastMinute) { //update the display only if time has changed
-      timeLastMinute = mm;
-      updateDisplay();
+  if (ntpLastSent == 0 && (now() - ntpLastReceived >= NTP_POLL_INTERVAL_SEC)) {
+    ntpSendPacket();
+    ntpLastSent = now();
+  }
+
+  if (ntpLastSent != 0) {
+    time_t t = ntpCheckPacket();
+    if (t != 0) {
+      ntpLastReceived = now();
+      ntpLastSent = 0;
+      setTime(t);
+      Homie.setNodeProperty(nTime, "value", String(t), true);
+    } else if (now() - ntpLastSent >= NTP_PACKET_EXPIRED_SEC) {
+      ntpLastSent = 0;
     }
   }
 
@@ -159,8 +152,32 @@ void updateDisplay() {
 
 /*-------- NTP code ----------*/
 
+WiFiUDP Udp;
+unsigned int localPort = 8888;  // local port to listen for UDP packets
+static const char ntpServerName[] = "raspberrypi";
+IPAddress ntpServerIP;
+
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+
+void ntpInit() {
+
+  Udp.begin(localPort);
+  WiFi.hostByName(ntpServerName, ntpServerIP);
+
+  ntpSendPacket();
+
+  time_t t = 0;
+  while (t == 0) {
+    t = ntpCheckPacket();
+    if (t != 0) {
+      setTime(t);
+      ntpLastReceived = now();
+      Homie.setNodeProperty(nTime, "value", String(t), true);
+    }
+  }
+  
+}
 
 time_t ntpCheckPacket() {
 
@@ -181,7 +198,7 @@ time_t ntpCheckPacket() {
 }
 
 // send an NTP request to the time server at the given address
-void ntpSendPacket(IPAddress &address) {
+void ntpSendPacket() {
   while (Udp.parsePacket() > 0) ; // discard any previously received packets
 
   // set all bytes in the buffer to 0
@@ -199,7 +216,7 @@ void ntpSendPacket(IPAddress &address) {
   packetBuffer[15] = 52;
   // all NTP fields have been given values, now
   // you can send a packet requesting a timestamp:
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
+  Udp.beginPacket(ntpServerIP, 123); //NTP requests are to port 123
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
   Udp.endPacket();
 }
