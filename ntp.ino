@@ -20,9 +20,8 @@ void ntpInit() {
     t = ntpCheckPacket();
   }
   
-  setTime(t);
+  setClockTime(t);
   ntpLastReceived = now();
-  Homie.setNodeProperty(nTime, "value", String(t), true);
 
 }
 

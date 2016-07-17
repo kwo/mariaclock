@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "2.1.8"
+#define FW_VERSION "2.1.9"
 #include <Homie.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
@@ -8,6 +8,12 @@
 const char *__FLAGGED_FW_NAME = "\xbf\x84\xe4\x13\x54" FW_NAME "\x93\x44\x6b\xa7\x75";
 const char *__FLAGGED_FW_VERSION = "\x6a\x3f\x3e\x0e\xe1" FW_VERSION "\xb0\x30\x48\xd4\x1a";
 /* End of magic sequence for Autodetectable Binary Upload */
+
+/* TODO
+ * ntpInit - must retry in case ntp packet not received
+ * 
+ * 
+ */
 
 const int LUX_PIN = 0;
 const int LUX_POLL_INTERVAL_SEC = 1;   // 1 second
@@ -53,15 +59,20 @@ void hSetup() {
   matrixInit();
 }
 
+void setClockTime(time_t t) {
+  setTime(t);
+  Homie.setNodeProperty(nTime, "value", String(t), true);
+  time_t local = timezone.toLocal(t);
+  Homie.setNodeProperty(nTime, "time", formatTime(local), true);
+}
+
 void hLoop() {
 
   int nn = minute();
   if (nn != timeLastMinute) { //update the display only if time has changed
     timeLastMinute = nn;
     time_t local = timezone.toLocal(now());
-    int hh = hour(local);
-    int mm = minute(local);
-    matrixDisplay(hh, mm);
+    matrixDisplay(hour(local), minute(local));
   }
 
   if (now() - luxLastPoll >= LUX_POLL_INTERVAL_SEC) {
@@ -77,10 +88,10 @@ void hLoop() {
     if (now() - luxLastSent >= LUX_SEND_INTERVAL_SEC) {
       if (luxReading != luxLastReading) {
         luxLastReading = luxReading;
-        if (Homie.setNodeProperty(nLux, "value", String(luxLastReading), true)) {
+        if (Homie.setNodeProperty(nLux, "value", String(luxRaw), true)) {
           luxLastSent = now();
         }
-        Homie.setNodeProperty(nLux, "raw", String(luxRaw), true);
+        Homie.setNodeProperty(nLux, "level", String(luxLastReading), true);
       }
     }
 
@@ -96,8 +107,7 @@ void hLoop() {
     if (t != 0) {
       ntpLastReceived = now();
       ntpLastSent = 0;
-      setTime(t);
-      Homie.setNodeProperty(nTime, "value", String(t), true);
+      setClockTime(t);
     } else if (now() - ntpLastSent >= NTP_PACKET_EXPIRED_SEC) {
       ntpLastSent = 0;
     }
@@ -105,4 +115,15 @@ void hLoop() {
 
 }
 
+
+String formatTime(time_t t) {
+  return padDigit(hour(t)) + ":" + padDigit(minute(t)) + ":" + padDigit(second(t));
+}
+
+String padDigit(int i) {
+  if (i < 10) {
+    return "0" + String(i);
+  }
+  return String(i);
+}
 
