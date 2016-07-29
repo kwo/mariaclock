@@ -27,6 +27,13 @@ int timeLastMinute = -1; // last recorded minute
 
 void setup() {
 
+  Serial.begin(9600);
+  delay(250);
+
+  Serial.print(FW_NAME);
+  Serial.print(" ");
+  Serial.println(FW_VERSION);
+
   WiFi.begin(ssid, pass);
 
   while (WiFi.status() != WL_CONNECTED) {
