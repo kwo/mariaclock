@@ -21,7 +21,7 @@ void ntpInit() {
   }
   
   setClockTime(t);
-  ntpLastReceived = now();
+  ntpNextPoll = now() + NTP_POLL_INTERVAL_SEC;
 
 }
 
