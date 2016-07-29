@@ -2,7 +2,7 @@
 
 WiFiUDP Udp;
 unsigned int localPort = 8888;  // local port to listen for UDP packets
-static const char ntpServerName[] = "raspberrypi";
+static const char ntpServerName[] = "kobold";
 IPAddress ntpServerIP;
 
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
