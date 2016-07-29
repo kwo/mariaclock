@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "2.1.9"
+#define FW_VERSION "2.1.10"
 #include <Homie.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
@@ -61,9 +61,14 @@ void hSetup() {
 
 void setClockTime(time_t t) {
   setTime(t);
-  Homie.setNodeProperty(nTime, "value", String(t), true);
+  Serial.println("NTP: set time.");
+  if (!Homie.setNodeProperty(nTime, "value", String(t), true)) {
+    Serial.println("Homie: cannot set time value.");    
+  }
   time_t local = timezone.toLocal(t);
-  Homie.setNodeProperty(nTime, "time", formatTime(local), true);
+  if (!Homie.setNodeProperty(nTime, "time", formatTime(local), true)) {
+    Serial.println("Homie: cannot set time time.");    
+  }
 }
 
 void hLoop() {
@@ -90,8 +95,12 @@ void hLoop() {
         luxLastReading = luxReading;
         if (Homie.setNodeProperty(nLux, "value", String(luxRaw), true)) {
           luxLastSent = now();
+        } else {
+          Serial.println("Homie: cannot set lux value.");
         }
-        Homie.setNodeProperty(nLux, "level", String(luxLastReading), true);
+        if (!Homie.setNodeProperty(nLux, "level", String(luxLastReading), true)) {
+          Serial.println("Homie: cannot set lux level.");
+        }
       }
     }
 
@@ -100,15 +109,18 @@ void hLoop() {
   if (ntpLastSent == 0 && (now() - ntpLastReceived >= NTP_POLL_INTERVAL_SEC)) {
     ntpSendPacket();
     ntpLastSent = now();
+    Serial.println("NTP: send packet.");
   }
 
   if (ntpLastSent != 0) {
     time_t t = ntpCheckPacket();
     if (t != 0) {
+      Serial.println("NTP: got packet.");
       ntpLastReceived = now();
       ntpLastSent = 0;
       setClockTime(t);
     } else if (now() - ntpLastSent >= NTP_PACKET_EXPIRED_SEC) {
+      Serial.println("NTP: packet expired.");
       ntpLastSent = 0;
     }
   }
