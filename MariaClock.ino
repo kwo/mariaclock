@@ -70,7 +70,7 @@ void loop() {
 
   }
 
-  if (ntpLastSent == 0 && (ntpNextPoll == 0 || ntpNextPoll > now())) {
+  if (ntpLastSent == 0 && now() > ntpNextPoll) {
     ntpSendPacket();
     ntpLastSent = now();
     Serial.println("NTP: send packet.");
