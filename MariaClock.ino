@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "3.0.0"
+#define FW_VERSION "3.0.1"
 #include <ESP8266WiFi.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
@@ -30,6 +30,7 @@ void setup() {
   Serial.begin(9600);
   delay(250);
 
+  Serial.println("");
   Serial.print(FW_NAME);
   Serial.print(" ");
   Serial.println(FW_VERSION);
@@ -73,18 +74,18 @@ void loop() {
   if (ntpLastSent == 0 && now() > ntpNextPoll) {
     ntpSendPacket();
     ntpLastSent = now();
-    Serial.println("NTP: send packet.");
+    Serial.println("NTP send packet.");
   }
 
   if (ntpLastSent != 0) {
     time_t t = ntpCheckPacket();
     if (t != 0) {
-      Serial.println("NTP: got packet.");
+      Serial.println("NTP got packet.");
       ntpNextPoll = now() + NTP_POLL_INTERVAL_SEC;
       ntpLastSent = 0;
       setClockTime(t);
     } else if (now() - ntpLastSent >= NTP_PACKET_TIMEOUT_SEC) {
-      Serial.println("NTP: packet expired.");
+      Serial.println("NTP packet expired.");
       ntpNextPoll = now() + 60; // wait a minute
       ntpLastSent = 0;
     }
@@ -94,7 +95,8 @@ void loop() {
 
 void setClockTime(time_t t) {
   setTime(t);
-  Serial.println("NTP: set time.");
+  Serial.print("NTP set time: ");
+  Serial.println(formatTime(t));
 }
 
 String formatTime(time_t t) {
