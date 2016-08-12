@@ -2,7 +2,7 @@
 
 WiFiUDP Udp;
 unsigned int localPort = 8888;  // local port to listen for UDP packets
-static const char ntpServerName[] = "kobold";
+static const char ntpServerName[] = "de.pool.ntp.org";
 IPAddress ntpServerIP;
 
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message

@@ -1,5 +1,5 @@
 #define FW_NAME "mariaclock"
-#define FW_VERSION "3.0.1"
+#define FW_VERSION "3.0.2"
 #include <ESP8266WiFi.h>
 #include <TimeLib.h>   // https://github.com/PaulStoffregen/Time
 #include <Timezone.h>  // https://github.com/tauonteilchen/Timezone https://github.com/JChristensen/Timezone
